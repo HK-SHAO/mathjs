@@ -1,10 +1,11 @@
 import { isArray, isBigNumber, isCollection, isIndex, isMatrix, isNumber, isString, typeOf } from '../../utils/is.js'
-import { arraySize, getArrayDataType, processSizesWildcard, reshape, resize, unsqueeze, validate, validateIndex } from '../../utils/array.js'
+import { arraySize, getArrayDataType, processSizesWildcard, reshape, resize, unsqueeze, validate, validateIndex, broadcastTo } from '../../utils/array.js'
 import { format } from '../../utils/string.js'
 import { isInteger } from '../../utils/number.js'
 import { clone, deepStrictEqual } from '../../utils/object.js'
 import { DimensionError } from '../../error/DimensionError.js'
 import { factory } from '../../utils/factory.js'
+import { maxArgumentCount } from '../../utils/function.js'
 
 const name = 'DenseMatrix'
 const dependencies = [
@@ -15,6 +16,7 @@ export const createDenseMatrixClass = /* #__PURE__ */ factory(name, dependencies
   /**
    * Dense Matrix implementation. A regular, dense matrix, supporting multi-dimensional matrices. This is the default matrix type.
    * @class DenseMatrix
+   * @enum {{ value, index: number[] }}
    */
   function DenseMatrix (data, datatype) {
     if (!(this instanceof DenseMatrix)) { throw new SyntaxError('Constructor must be called with the new operator') }
@@ -72,6 +74,8 @@ export const createDenseMatrixClass = /* #__PURE__ */ factory(name, dependencies
   /**
    * Attach type information
    */
+  Object.defineProperty(DenseMatrix, 'name', { value: 'DenseMatrix' })
+  DenseMatrix.prototype.constructor = DenseMatrix
   DenseMatrix.prototype.type = 'DenseMatrix'
   DenseMatrix.prototype.isDenseMatrix = true
 
@@ -317,10 +321,22 @@ export const createDenseMatrixClass = /* #__PURE__ */ factory(name, dependencies
       if (sSize.length !== 0) {
         throw new TypeError('Scalar expected')
       }
-
       matrix.set(index.min(), submatrix, defaultValue)
     } else {
       // set a submatrix
+
+      // broadcast submatrix
+      if (!deepStrictEqual(sSize, iSize)) {
+        try {
+          if (sSize.length === 0) {
+            submatrix = broadcastTo([submatrix], iSize)
+          } else {
+            submatrix = broadcastTo(submatrix, iSize)
+          }
+          sSize = arraySize(submatrix)
+        } catch {
+        }
+      }
 
       // validate dimensions
       if (iSize.length < matrix._size.length) {
@@ -534,13 +550,21 @@ export const createDenseMatrixClass = /* #__PURE__ */ factory(name, dependencies
   DenseMatrix.prototype.map = function (callback) {
     // matrix instance
     const me = this
+    const args = maxArgumentCount(callback)
     const recurse = function (value, index) {
       if (isArray(value)) {
         return value.map(function (child, i) {
           return recurse(child, index.concat(i))
         })
       } else {
-        return callback(value, index, me)
+        // invoke the callback function with the right number of arguments
+        if (args === 1) {
+          return callback(value)
+        } else if (args === 2) {
+          return callback(value, index)
+        } else { // 3 or -1
+          return callback(value, index, me)
+        }
       }
     }
 
@@ -573,6 +597,64 @@ export const createDenseMatrixClass = /* #__PURE__ */ factory(name, dependencies
       }
     }
     recurse(this._data, [])
+  }
+
+  /**
+   * Iterate over the matrix elements
+   * @return {Iterable<{ value, index: number[] }>}
+   */
+  DenseMatrix.prototype[Symbol.iterator] = function * () {
+    const recurse = function * (value, index) {
+      if (isArray(value)) {
+        for (let i = 0; i < value.length; i++) {
+          yield * recurse(value[i], index.concat(i))
+        }
+      } else {
+        yield ({ value, index })
+      }
+    }
+    yield * recurse(this._data, [])
+  }
+
+  /**
+   * Returns an array containing the rows of a 2D matrix
+   * @returns {Array<Matrix>}
+   */
+  DenseMatrix.prototype.rows = function () {
+    const result = []
+
+    const s = this.size()
+    if (s.length !== 2) {
+      throw new TypeError('Rows can only be returned for a 2D matrix.')
+    }
+
+    const data = this._data
+    for (const row of data) {
+      result.push(new DenseMatrix([row], this._datatype))
+    }
+
+    return result
+  }
+
+  /**
+   * Returns an array containing the columns of a 2D matrix
+   * @returns {Array<Matrix>}
+   */
+  DenseMatrix.prototype.columns = function () {
+    const result = []
+
+    const s = this.size()
+    if (s.length !== 2) {
+      throw new TypeError('Rows can only be returned for a 2D matrix.')
+    }
+
+    const data = this._data
+    for (let i = 0; i < s[1]; i++) {
+      const col = data.map(row => [row[i]])
+      result.push(new DenseMatrix(col, this._datatype))
+    }
+
+    return result
   }
 
   /**
@@ -671,7 +753,7 @@ export const createDenseMatrixClass = /* #__PURE__ */ factory(name, dependencies
 
     // create DenseMatrix
     return new DenseMatrix({
-      data: data,
+      data,
       size: [n],
       datatype: this._datatype
     })
@@ -789,7 +871,7 @@ export const createDenseMatrixClass = /* #__PURE__ */ factory(name, dependencies
 
     // create DenseMatrix
     return new DenseMatrix({
-      data: data,
+      data,
       size: [rows, columns]
     })
   }
@@ -850,19 +932,18 @@ export const createDenseMatrixClass = /* #__PURE__ */ factory(name, dependencies
 
   /**
    * Preprocess data, which can be an Array or DenseMatrix with nested Arrays and
-   * Matrices. Replaces all nested Matrices with Arrays
+   * Matrices. Clones all (nested) Arrays, and replaces all nested Matrices with Arrays
    * @memberof DenseMatrix
-   * @param {Array} data
+   * @param {Array | Matrix} data
    * @return {Array} data
    */
   function preprocess (data) {
-    for (let i = 0, ii = data.length; i < ii; i++) {
-      const elem = data[i]
-      if (isArray(elem)) {
-        data[i] = preprocess(elem)
-      } else if (elem && elem.isMatrix === true) {
-        data[i] = preprocess(elem.valueOf())
-      }
+    if (isMatrix(data)) {
+      return preprocess(data.valueOf())
+    }
+
+    if (isArray(data)) {
+      return data.map(preprocess)
     }
 
     return data

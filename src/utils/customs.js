@@ -41,6 +41,14 @@ function setSafeProperty (object, prop, value) {
   throw new Error('No access to property "' + prop + '"')
 }
 
+function getSafeProperties (object) {
+  return Object.keys(object).filter((prop) => hasOwnProperty(object, prop))
+}
+
+function hasSafeProperty (object, prop) {
+  return prop in object
+}
+
 /**
  * Test whether a property is safe to use for an object.
  * For example .toString and .constructor are not safe
@@ -80,12 +88,14 @@ function isSafeProperty (object, prop) {
  * Throws an error when that's not the case.
  * @param {Object} object
  * @param {string} method
+ * @return {function} Returns the method when valid
  */
-// TODO: merge this function into assign.js?
-function validateSafeMethod (object, method) {
+function getSafeMethod (object, method) {
   if (!isSafeMethod(object, method)) {
     throw new Error('No access to method "' + method + '"')
   }
+
+  return object[method]
 }
 
 /**
@@ -148,6 +158,8 @@ const safeNativeMethods = {
 export { getSafeProperty }
 export { setSafeProperty }
 export { isSafeProperty }
-export { validateSafeMethod }
+export { hasSafeProperty }
+export { getSafeProperties }
+export { getSafeMethod }
 export { isSafeMethod }
 export { isPlainObject }

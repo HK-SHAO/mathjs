@@ -94,6 +94,14 @@ describe('subtract', function () {
     assert.deepStrictEqual(subtract(math.unit(math.complex(10, 10), 'K'), math.unit(3, 'K')), math.unit(math.complex(7, 10), 'K'))
   })
 
+  it('should subtract units even when they have offsets', function () {
+    let t = math.unit(20, 'degC')
+    assert.deepStrictEqual(subtract(t, math.unit(1, 'degC')), math.unit(19, 'degC'))
+    t = math.unit(68, 'degF')
+    approx.deepEqual(subtract(t, math.unit(2, 'degF')), math.unit(66, 'degF'))
+    approx.deepEqual(subtract(t, math.unit(1, 'degC')), math.unit(66.2, 'degF'))
+  })
+
   it('should throw an error if subtracting two quantities of different units', function () {
     assert.throws(function () {
       subtract(math.unit(5, 'km'), math.unit(100, 'gram'))
@@ -138,6 +146,15 @@ describe('subtract', function () {
       assert.deepStrictEqual(subtract(2, [3, 0]), [-1, 2])
       assert.deepStrictEqual(subtract([3, 4], 2), [1, 2])
       assert.deepStrictEqual(subtract([3, 0], 2), [1, -2])
+    })
+
+    it('should substract broadcastable arrays correctly', function () {
+      const a2 = [1, 2]
+      const a3 = [[3], [4]]
+      const a4 = subtract(a2, a3)
+      const a5 = subtract(a3, a2)
+      assert.deepStrictEqual(a4, [[-2, -1], [-3, -2]])
+      assert.deepStrictEqual(a5, [[2, 1], [3, 2]])
     })
 
     it('should subtract array and dense matrix correctly', function () {

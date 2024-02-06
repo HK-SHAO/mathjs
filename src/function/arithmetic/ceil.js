@@ -3,17 +3,44 @@ import { factory } from '../../utils/factory.js'
 import { deepMap } from '../../utils/collection.js'
 import { nearlyEqual } from '../../utils/number.js'
 import { nearlyEqual as bigNearlyEqual } from '../../utils/bignumber/nearlyEqual.js'
-import { ceilNumber } from '../../plain/number/index.js'
-import { createAlgorithm11 } from '../../type/matrix/utils/algorithm11.js'
-import { createAlgorithm14 } from '../../type/matrix/utils/algorithm14.js'
+import { createMatAlgo11xS0s } from '../../type/matrix/utils/matAlgo11xS0s.js'
+import { createMatAlgo12xSfs } from '../../type/matrix/utils/matAlgo12xSfs.js'
+import { createMatAlgo14xDs } from '../../type/matrix/utils/matAlgo14xDs.js'
 
 const name = 'ceil'
-const dependencies = ['typed', 'config', 'round', 'matrix', 'equalScalar']
+const dependencies = ['typed', 'config', 'round', 'matrix', 'equalScalar', 'zeros', 'DenseMatrix']
 
-export const createCeil = /* #__PURE__ */ factory(name, dependencies, ({ typed, config, round, matrix, equalScalar }) => {
-  const algorithm11 = createAlgorithm11({ typed, equalScalar })
-  const algorithm14 = createAlgorithm14({ typed })
+export const createCeilNumber = /* #__PURE__ */ factory(
+  name, ['typed', 'config', 'round'], ({ typed, config, round }) => {
+    return typed(name, {
+      number: function (x) {
+        if (nearlyEqual(x, round(x), config.epsilon)) {
+          return round(x)
+        } else {
+          return Math.ceil(x)
+        }
+      },
 
+      'number, number': function (x, n) {
+        if (nearlyEqual(x, round(x, n), config.epsilon)) {
+          return round(x, n)
+        } else {
+          let [number, exponent] = `${x}e`.split('e')
+          const result = Math.ceil(Number(`${number}e${Number(exponent) + n}`));
+          [number, exponent] = `${result}e`.split('e')
+          return Number(`${number}e${Number(exponent) - n}`)
+        }
+      }
+    })
+  }
+)
+
+export const createCeil = /* #__PURE__ */ factory(name, dependencies, ({ typed, config, round, matrix, equalScalar, zeros, DenseMatrix }) => {
+  const matAlgo11xS0s = createMatAlgo11xS0s({ typed, equalScalar })
+  const matAlgo12xSfs = createMatAlgo12xSfs({ typed, DenseMatrix })
+  const matAlgo14xDs = createMatAlgo14xDs({ typed })
+
+  const ceilNumber = createCeilNumber({ typed, config, round })
   /**
    * Round a value towards plus infinity
    * If `x` is complex, both real and imaginary part are rounded towards plus infinity.
@@ -52,24 +79,8 @@ export const createCeil = /* #__PURE__ */ factory(name, dependencies, ({ typed, 
    * @return {number | BigNumber | Fraction | Complex | Array | Matrix} Rounded value
    */
   return typed('ceil', {
-    number: function (x) {
-      if (nearlyEqual(x, round(x), config.epsilon)) {
-        return round(x)
-      } else {
-        return ceilNumber(x)
-      }
-    },
-
-    'number, number': function (x, n) {
-      if (nearlyEqual(x, round(x, n), config.epsilon)) {
-        return round(x, n)
-      } else {
-        let [number, exponent] = `${x}e`.split('e')
-        const result = Math.ceil(Number(`${number}e${Number(exponent) + n}`));
-        [number, exponent] = `${result}e`.split('e')
-        return Number(`${number}e${Number(exponent) - n}`)
-      }
-    },
+    number: ceilNumber.signatures.number,
+    'number,number': ceilNumber.signatures['number,number'],
 
     Complex: function (x) {
       return x.ceil()
@@ -77,6 +88,10 @@ export const createCeil = /* #__PURE__ */ factory(name, dependencies, ({ typed, 
 
     'Complex, number': function (x, n) {
       return x.ceil(n)
+    },
+
+    'Complex, BigNumber': function (x, n) {
+      return x.ceil(n.toNumber())
     },
 
     BigNumber: function (x) {
@@ -103,27 +118,41 @@ export const createCeil = /* #__PURE__ */ factory(name, dependencies, ({ typed, 
       return x.ceil(n)
     },
 
-    'Array | Matrix': function (x) {
+    'Fraction, BigNumber': function (x, n) {
+      return x.ceil(n.toNumber())
+    },
+
+    'Array | Matrix': typed.referToSelf(self => (x) => {
       // deep map collection, skip zeros since ceil(0) = 0
-      return deepMap(x, this, true)
-    },
+      return deepMap(x, self, true)
+    }),
 
-    'Array | Matrix, number': function (x, n) {
+    'Array, number | BigNumber': typed.referToSelf(self => (x, n) => {
       // deep map collection, skip zeros since ceil(0) = 0
-      return deepMap(x, i => this(i, n), true)
-    },
+      return deepMap(x, i => self(i, n), true)
+    }),
 
-    'SparseMatrix, number | BigNumber': function (x, y) {
-      return algorithm11(x, y, this, false)
-    },
+    'SparseMatrix, number | BigNumber': typed.referToSelf(self => (x, y) => {
+      return matAlgo11xS0s(x, y, self, false)
+    }),
 
-    'DenseMatrix, number | BigNumber': function (x, y) {
-      return algorithm14(x, y, this, false)
-    },
+    'DenseMatrix, number | BigNumber': typed.referToSelf(self => (x, y) => {
+      return matAlgo14xDs(x, y, self, false)
+    }),
 
-    'number | Complex | BigNumber, Array': function (x, y) {
-      // use matrix implementation
-      return algorithm14(matrix(y), x, this, true).valueOf()
-    }
+    'number | Complex | Fraction | BigNumber, Array':
+      typed.referToSelf(self => (x, y) => {
+        // use matrix implementation
+        return matAlgo14xDs(matrix(y), x, self, true).valueOf()
+      }),
+
+    'number | Complex | Fraction | BigNumber, Matrix':
+      typed.referToSelf(self => (x, y) => {
+        if (equalScalar(x, 0)) return zeros(y.size(), y.storage())
+        if (y.storage() === 'dense') {
+          return matAlgo14xDs(y, x, self, true)
+        }
+        return matAlgo12xSfs(y, x, self, true)
+      })
   })
 })

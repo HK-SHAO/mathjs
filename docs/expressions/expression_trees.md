@@ -93,10 +93,10 @@ All nodes have the following methods:
     // returns an array with two entries: two SymbolNodes 'x'
     ```
 
--   `forEach(callback: function) : Node[]`
+-   `forEach(callback: function) : void`
 
     Execute a callback for each of the child nodes of this node. The `callback`
-    function is called as `callback(child: Node, path: string, parent: Node)`.
+    function is called as `callback(child: Node, path: string, parent: Node): void`.
     Parameter `path` is a string containing a relative JSON Path.
 
     See also `traverse`, which is a recursive version of `forEach`.
@@ -207,7 +207,7 @@ All nodes have the following methods:
     transformed.toString() // returns '3 ^ 2 + 5 * 3'
     ```
 
--   `traverse(callback)`
+-   `traverse(callback: function): void`
 
     Recursively traverse all nodes in a node tree. Executes given callback for
     this node and each of its child nodes. Similar to `Array.forEach`, except
@@ -291,7 +291,8 @@ Examples:
 const node1 = math.parse('a[3]')
 
 const object = new math.SymbolNode('a')
-const index = new math.IndexNode([3])
+const constant3 = new math.ConstantNode(3)
+const index = new math.IndexNode([constant3])
 const node2 = new math.AccessorNode(object, index)
 ```
 
@@ -478,6 +479,11 @@ Properties:
 - `fn: Node | string` (read-only) The object or function name which to invoke.
 - `args: Node[]`
 
+Static functions:
+
+- `FunctionNode.onUndefinedFunction(name: string)`. This function is invoked when an undefined function is evaluated. By default, the function throws an exception "Undefined function x". The function can be overwritten to customize this behavior. See also `SymbolNode.onUndefinedSymbol`.
+
+
 Examples:
 
 ```js
@@ -522,7 +528,7 @@ const three = new math.ConstantNode(3)
 
 const range = new math.RangeNode(one, three)
 const index = new math.IndexNode([range, two])
-const node2 = new math.AccessNode(A, index)
+const node2 = new math.AccessorNode(A, index)
 ```
 
 ### ObjectNode
@@ -554,7 +560,7 @@ const node2 = new math.ObjectNode({a: a, b: b, c: c})
 Construction:
 
 ```
-new OperatorNode(op: string, fn: string, args: Node[])
+new OperatorNode(op: string, fn: string, args: Node[], implicit: boolean = false)
 ```
 
 Additional methods:
@@ -587,6 +593,7 @@ Properties:
 - `op: string`
 - `fn: string`
 - `args: Node[]`
+- `implicit: boolean` True in case of an implicit multiplication, false otherwise
 
 Examples:
 
@@ -689,6 +696,11 @@ new SymbolNode(name: string)
 Properties:
 
 - `name: string`
+
+Static functions:
+
+- `SymbolNode.onUndefinedSymbol(name: string)`. This function is invoked when an undefined symbol is evaluated. By default, the function throws an exception "Undefined symbol x". The function can be overwritten to customize this behavior. See also `FunctionNode.onUndefinedFunction`.
+
 
 Examples:
 

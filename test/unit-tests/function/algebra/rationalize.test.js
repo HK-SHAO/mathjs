@@ -34,8 +34,6 @@ function objToStrings (obj) {
 
 /// ////////////////// rationalize ///////////////////////
 describe('rationalize', function () {
-  this.timeout(10000) // For IE/Edge
-
   it('invalid expression', function () {
     assert.throws(function () { math.rationalize('(x*/2)') }, /Value expected \(char 4\)/)
   })
@@ -108,7 +106,7 @@ describe('rationalize', function () {
   it('processing 2 variable expressions', function () {
     assert.strictEqual(stri(math.rationalize('x+y')), 'x+y')
     assert.strictEqual(stri(math.rationalize('x^2 + 2*x*y + 3')), 'x^2+2*x*y+3')
-    assert.strictEqual(stri(math.rationalize('2x/y - y/(x+1)')), '(2*x^2-y^2+2*x)/(x*y+y)')
+    assert.strictEqual(stri(math.rationalize('2x/y - y/(x+1)')), '(2*x^2+2*x-y^2)/(x*y+y)')
   })
 
   it('processing power expressions', function () {
@@ -124,6 +122,7 @@ describe('rationalize', function () {
     assert.strictEqual(stri(math.rationalize(no)), '(-20*x^4+28*x^3+104*x^2+6*x-12)/(6*x^2+5*x-4)')
   })
 
+  // eslint-disable-next-line mocha/no-skipped-tests
   it.skip('processes a really complex expression', function () {
     // note this test passes but takes for ever to complete
 
@@ -147,8 +146,8 @@ describe('rationalize', function () {
     assert.deepStrictEqual(objToStrings(math.rationalize('2x/y - y/(x+1)', {}, true)), {
       coefficients: '',
       denominator: 'x*y+y',
-      expression: '(2*x^2-y^2+2*x)/(x*y+y)',
-      numerator: '2*x^2-y^2+2*x',
+      expression: '(2*x^2+2*x-y^2)/(x*y+y)',
+      numerator: '2*x^2+2*x-y^2',
       variables: 'x,y'
     })
     assert.deepStrictEqual(objToStrings(math.rationalize('-2+5x^2', {}, true)), {

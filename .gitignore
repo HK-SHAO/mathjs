@@ -9,6 +9,8 @@ _site
 node_modules
 .nyc_output
 /coverage
+.eslintcache
 
 lib
+test-results
 *.generated.js

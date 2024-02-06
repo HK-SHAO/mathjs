@@ -6,6 +6,9 @@ describe('reshape', function () {
   it('should reshape an array', function () {
     const array = [[0, 1, 2], [3, 4, 5]]
     assert.deepStrictEqual(math.reshape(array, [3, 2]), [[0, 1], [2, 3], [4, 5]])
+
+    // should not have mutated the input
+    assert.deepStrictEqual(array, [[0, 1, 2], [3, 4, 5]])
   })
 
   it('should reshape an array with bignumbers', function () {
@@ -24,6 +27,9 @@ describe('reshape', function () {
       math.matrix([[0, 1], [2, 3], [4, 5]]))
     assert.deepStrictEqual(math.reshape(matrix, math.matrix([3, 2])),
       math.matrix([[0, 1], [2, 3], [4, 5]]))
+
+    // should not have mutated the input
+    assert.deepStrictEqual(matrix, math.matrix([[0, 1, 2], [3, 4, 5]]))
   })
 
   it('should reshape a flat single-element array into multiple dimensions', function () {
@@ -60,7 +66,7 @@ describe('reshape', function () {
 
   it('should LaTeX reshape', function () {
     const expression = math.parse('reshape([1,2],1)')
-    assert.strictEqual(expression.toTex(), '\\mathrm{reshape}\\left(\\begin{bmatrix}1\\\\2\\\\\\end{bmatrix},1\\right)')
+    assert.strictEqual(expression.toTex(), '\\mathrm{reshape}\\left(\\begin{bmatrix}1\\\\2\\end{bmatrix},1\\right)')
   })
 
   it('should reshape a SparseMatrix', function () {

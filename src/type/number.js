@@ -35,7 +35,7 @@ function makeNumberFromNonDecimalParts (parts) {
   }
   const result = n + f
   if (isNaN(result)) {
-    throw new SyntaxError('String "' + parts.input + '" is no valid number')
+    throw new SyntaxError('String "' + parts.input + '" is not a valid number')
   }
   return result
 }
@@ -91,7 +91,7 @@ export const createNumber = /* #__PURE__ */ factory(name, dependencies, ({ typed
       }
       let num = Number(x)
       if (isNaN(num)) {
-        throw new SyntaxError('String "' + x + '" is no valid number')
+        throw new SyntaxError('String "' + x + '" is not a valid number')
       }
       if (wordSizeSuffixMatch) {
         // x is a signed bin, oct, or hex literal
@@ -116,9 +116,11 @@ export const createNumber = /* #__PURE__ */ factory(name, dependencies, ({ typed
       return x.valueOf()
     },
 
-    Unit: function (x) {
-      throw new Error('Second argument with valueless unit expected')
-    },
+    Unit: typed.referToSelf(self => (x) => {
+      const clone = x.clone()
+      clone.value = self(x.value)
+      return clone
+    }),
 
     null: function (x) {
       return 0
@@ -128,9 +130,7 @@ export const createNumber = /* #__PURE__ */ factory(name, dependencies, ({ typed
       return unit.toNumber(valuelessUnit)
     },
 
-    'Array | Matrix': function (x) {
-      return deepMap(x, this)
-    }
+    'Array | Matrix': typed.referToSelf(self => x => deepMap(x, self))
   })
 
   // reviver function to parse a JSON object like:

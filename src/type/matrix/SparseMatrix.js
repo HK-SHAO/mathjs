@@ -5,6 +5,7 @@ import { clone, deepStrictEqual } from '../../utils/object.js'
 import { arraySize, getArrayDataType, processSizesWildcard, unsqueeze, validateIndex } from '../../utils/array.js'
 import { factory } from '../../utils/factory.js'
 import { DimensionError } from '../../error/DimensionError.js'
+import { maxArgumentCount } from '../../utils/function.js'
 
 const name = 'SparseMatrix'
 const dependencies = [
@@ -15,8 +16,9 @@ const dependencies = [
 
 export const createSparseMatrixClass = /* #__PURE__ */ factory(name, dependencies, ({ typed, equalScalar, Matrix }) => {
   /**
-   * Sparse Matrix implementation. This type implements a Compressed Column Storage format
-   * for sparse matrices.
+   * Sparse Matrix implementation. This type implements
+   * a [Compressed Column Storage](https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_column_(CSC_or_CCS))
+   * format for two-dimensional sparse matrices.
    * @class SparseMatrix
    */
   function SparseMatrix (data, datatype) {
@@ -148,6 +150,8 @@ export const createSparseMatrixClass = /* #__PURE__ */ factory(name, dependencie
   /**
    * Attach type information
    */
+  Object.defineProperty(SparseMatrix, 'name', { value: 'SparseMatrix' })
+  SparseMatrix.prototype.constructor = SparseMatrix
   SparseMatrix.prototype.type = 'SparseMatrix'
   SparseMatrix.prototype.isSparseMatrix = true
 
@@ -325,10 +329,10 @@ export const createSparseMatrixClass = /* #__PURE__ */ factory(name, dependencie
 
     // return matrix
     return new SparseMatrix({
-      values: values,
-      index: index,
-      ptr: ptr,
-      size: size,
+      values,
+      index,
+      ptr,
+      size,
       datatype: matrix._datatype
     })
   }
@@ -390,23 +394,25 @@ export const createSparseMatrixClass = /* #__PURE__ */ factory(name, dependencie
         throw new DimensionError(iSize, sSize, '>')
       }
 
-      // offsets
-      const x0 = index.min()[0]
-      const y0 = index.min()[1]
-
-      // submatrix rows and columns
-      const m = sSize[0]
-      const n = sSize[1]
-
-      // loop submatrix
-      for (let x = 0; x < m; x++) {
-        // loop columns
-        for (let y = 0; y < n; y++) {
-          // value at i, j
-          const v = submatrix[x][y]
-          // invoke set (zero value will remove entry from matrix)
-          matrix.set([x + x0, y + y0], v, defaultValue)
-        }
+      // insert the sub matrix
+      if (iSize.length === 1) {
+        // if the replacement index only has 1 dimension, go trough each one and set its value
+        const range = index.dimension(0)
+        range.forEach(function (dataIndex, subIndex) {
+          validateIndex(dataIndex)
+          matrix.set([dataIndex, 0], submatrix[subIndex[0]], defaultValue)
+        })
+      } else {
+        // if the replacement index has 2 dimensions, go through each one and set the value in the correct index
+        const firstDimensionRange = index.dimension(0)
+        const secondDimensionRange = index.dimension(1)
+        firstDimensionRange.forEach(function (firstDataIndex, firstSubIndex) {
+          validateIndex(firstDataIndex)
+          secondDimensionRange.forEach(function (secondDataIndex, secondSubIndex) {
+            validateIndex(secondDataIndex)
+            matrix.set([firstDataIndex, secondDataIndex], submatrix[firstSubIndex[0]][secondSubIndex[0]], defaultValue)
+          })
+        })
       }
     }
     return matrix
@@ -504,8 +510,10 @@ export const createSparseMatrixClass = /* #__PURE__ */ factory(name, dependencie
         _remove(k, j, this._values, this._index, this._ptr)
       }
     } else {
-      // insert value @ (i, j)
-      _insert(k, i, j, v, this._values, this._index, this._ptr)
+      if (!eq(v, zero)) {
+        // insert value @ (i, j)
+        _insert(k, i, j, v, this._values, this._index, this._ptr)
+      }
     }
 
     return this
@@ -546,6 +554,8 @@ export const createSparseMatrixClass = /* #__PURE__ */ factory(name, dependencie
    *
    * @memberof SparseMatrix
    * @param {number[] | Matrix} size  The new size the matrix should have.
+   *                                  Since sparse matrices are always two-dimensional,
+   *                                  size must be two numbers in either an array or a matrix
    * @param {*} [defaultValue=0]      Default value, filled in on new entries.
    *                                  If not provided, the matrix elements will
    *                                  be filled with zeros.
@@ -710,6 +720,8 @@ export const createSparseMatrixClass = /* #__PURE__ */ factory(name, dependencie
    *
    * @memberof SparseMatrix
    * @param {number[]} sizes          The new size the matrix should have.
+   *                                  Since sparse matrices are always two-dimensional,
+   *                                  size must be two numbers in either an array or a matrix
    * @param {boolean} [copy]          Return a reshaped copy of the matrix
    *
    * @return {Matrix}                 The reshaped matrix
@@ -842,8 +854,11 @@ export const createSparseMatrixClass = /* #__PURE__ */ factory(name, dependencie
     const rows = this._size[0]
     const columns = this._size[1]
     // invoke callback
+    const args = maxArgumentCount(callback)
     const invoke = function (v, i, j) {
       // invoke callback
+      if (args === 1) return callback(v)
+      if (args === 2) return callback(v, [i, j])
       return callback(v, [i, j], me)
     }
     // invoke _map
@@ -924,9 +939,9 @@ export const createSparseMatrixClass = /* #__PURE__ */ factory(name, dependencie
     ptr.push(values.length)
     // return sparse matrix
     return new SparseMatrix({
-      values: values,
-      index: index,
-      ptr: ptr,
+      values,
+      index,
+      ptr,
       size: [maxRow - minRow + 1, maxColumn - minColumn + 1]
     })
   }
@@ -938,6 +953,8 @@ export const createSparseMatrixClass = /* #__PURE__ */ factory(name, dependencie
    *                              parameters: the value of the element, the index
    *                              of the element, and the Matrix being traversed.
    * @param {boolean} [skipZeros] Invoke callback function for non-zero values only.
+   *                              If false, the indices are guaranteed to be in order,
+   *                              if true, the indices can be unordered.
    */
   SparseMatrix.prototype.forEach = function (callback, skipZeros) {
     // check it is a pattern matrix
@@ -976,6 +993,28 @@ export const createSparseMatrixClass = /* #__PURE__ */ factory(name, dependencie
           const value = (i in values) ? values[i] : 0
           callback(value, [i, j], me)
         }
+      }
+    }
+  }
+
+  /**
+   * Iterate over the matrix elements, skipping zeros
+   * @return {Iterable<{ value, index: number[] }>}
+   */
+  SparseMatrix.prototype[Symbol.iterator] = function * () {
+    if (!this._values) { throw new Error('Cannot iterate a Pattern only matrix') }
+
+    const columns = this._size[1]
+
+    for (let j = 0; j < columns; j++) {
+      const k0 = this._ptr[j]
+      const k1 = this._ptr[j + 1]
+
+      for (let k = k0; k < k1; k++) {
+        // row index
+        const i = this._index[k]
+
+        yield ({ value: this._values[k], index: [i, j] })
       }
     }
   }
@@ -1148,9 +1187,9 @@ export const createSparseMatrixClass = /* #__PURE__ */ factory(name, dependencie
     ptr.push(values.length)
     // return matrix
     return new SparseMatrix({
-      values: values,
-      index: index,
-      ptr: ptr,
+      values,
+      index,
+      ptr,
       size: [n, 1]
     })
   }
@@ -1296,9 +1335,9 @@ export const createSparseMatrixClass = /* #__PURE__ */ factory(name, dependencie
     ptr.push(values.length)
     // create SparseMatrix
     return new SparseMatrix({
-      values: values,
-      index: index,
-      ptr: ptr,
+      values,
+      index,
+      ptr,
       size: [rows, columns]
     })
   }

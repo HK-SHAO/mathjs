@@ -115,10 +115,13 @@ describe('pow', function () {
   })
 
   it('should exponentiate a fraction to an non-integer power', function () {
-    assert.throws(function () { mathPredictable.pow(fraction(3), fraction(1.5)) }, /Function pow does not support non-integer exponents for fractions/)
+    assert.deepStrictEqual(math.pow(fraction(27, 8), fraction(2, 3)), fraction(9, 4))
 
-    assert.strictEqual(math.pow(fraction(4), 1.5), 8)
-    assert.strictEqual(math.pow(fraction(4), fraction(1.5)), 8)
+    approx.deepEqual(math.pow(fraction(4), 1.5114), 8.127434364206053)
+    approx.deepEqual(math.pow(fraction(4), fraction(1.5114)), 8.127434364206053)
+
+    assert.throws(function () { mathPredictable.pow(fraction(3), fraction(1.5114)) },
+      /Result of pow is non-rational and cannot be expressed as a fraction/)
   })
 
   it('should throw an error if used with wrong number of arguments', function () {
@@ -238,6 +241,21 @@ describe('pow', function () {
     approx.deepEqual(pow(matrix(a), 2), matrix(res))
   })
 
+  it('should raise an inverted matrix for power -1', function () {
+    const a = [
+      [2, -1, 0],
+      [-1, 2, -1],
+      [0, -1, 2]
+    ]
+    const res = [
+      [3 / 4, 1 / 2, 1 / 4],
+      [1 / 2, 1, 1 / 2],
+      [1 / 4, 1 / 2, 3 / 4]
+    ]
+    approx.deepEqual(pow(a, -1), res)
+    approx.deepEqual(pow(matrix(a), -1), matrix(res))
+  })
+
   it('should return identity matrix for power 0', function () {
     const a = [[1, 2], [3, 4]]
     const res = [[1, 0], [0, 1]]
@@ -246,8 +264,6 @@ describe('pow', function () {
   })
 
   it('should compute large size of square matrix', function () {
-    this.timeout(10000)
-
     const a = math.identity(30).valueOf()
     approx.deepEqual(pow(a, 1000), a)
     approx.deepEqual(pow(matrix(a), 1000), matrix(a))
@@ -263,6 +279,11 @@ describe('pow', function () {
     const a = [[1, 2], [3, 4]]
     assert.throws(function () { pow(a, 2.5) })
     assert.throws(function () { pow(a, [2, 3]) })
+  })
+
+  it('should throw an error when raising a non-invertible matrix to a negative integer power', function () {
+    const a = [[1, 1, 1], [1, 0, 0], [0, 0, 0]]
+    assert.throws(function () { pow(a, -1) })
   })
 
   it('should LaTeX pow', function () {

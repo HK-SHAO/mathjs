@@ -2,6 +2,7 @@
 import assert from 'assert'
 
 import math from '../../../../src/defaultInstance.js'
+import { format } from '../../../../src/utils/number.js'
 
 describe('format', function () {
   it('should format numbers', function () {
@@ -186,11 +187,15 @@ describe('format', function () {
       assert.strictEqual(math.format(1.25, { notation: 'hex' }), '0x1.4')
       assert.strictEqual(math.bin(-128), '-0b10000000')
       assert.strictEqual(math.bin(-128, 8), '0b10000000i8')
+      assert.strictEqual(math.bin(math.bignumber(-128), math.bignumber(8)), '0b10000000i8')
       assert.strictEqual(math.oct(-128), '-0o200')
       assert.strictEqual(math.oct(-128, 8), '0o200i8')
+      assert.strictEqual(math.oct(math.bignumber(-128), math.bignumber(8)), '0o200i8')
       assert.strictEqual(math.hex(-128), '-0x80')
       assert.strictEqual(math.hex(-128, 8), '0x80i8')
+      assert.strictEqual(math.hex(math.bignumber(-128), math.bignumber(8)), '0x80i8')
     })
+
     it('should throw an error for invalid values', function () {
       assert.throws(function () { math.format(1.25, { notation: 'hex', wordSize: 8 }) }, 'Error: Value must be an integer')
       assert.throws(function () { math.format(1, { notation: 'hex', wordSize: -8 }) }, 'Error: size must be greater than 0')
@@ -215,6 +220,32 @@ describe('format', function () {
       assert.strictEqual(bigmath.format(oneThird, 4), '0.3333')
       assert.strictEqual(bigmath.format(oneThird, 5), '0.33333')
       assert.strictEqual(bigmath.format(oneThird, 18), '0.333333333333333333')
+    })
+
+    it('should format big numbers with fixed precision', function () {
+      const oneThird = math.bignumber(1).div(3)
+      const twoThirds = math.bignumber(2).div(3)
+      assert.strictEqual(math.format(oneThird, { notation: 'fixed', precision: 10 }), '0.3333333333')
+      assert.strictEqual(math.format(oneThird.mul(-1), { notation: 'fixed', precision: 10 }), '-0.3333333333')
+      assert.strictEqual(math.format(twoThirds, { notation: 'fixed', precision: 10 }), '0.6666666667')
+      assert.strictEqual(math.format(twoThirds, { notation: 'fixed', precision: 20 }), '0.66666666666666666667')
+      assert.strictEqual(math.format(oneThird, { notation: 'fixed', precision: 20 }), '0.33333333333333333333')
+      assert.strictEqual(math.format(oneThird, { notation: 'fixed', precision: 0 }), '0')
+      assert.strictEqual(math.format(twoThirds, { notation: 'fixed', precision: 0 }), '1')
+      assert.strictEqual(math.format(math.bignumber('123456789.123456789'), { notation: 'fixed', precision: 5 }), '123456789.12346')
+    })
+
+    it('should support a Bignumber as precision', function () {
+      assert.strictEqual(math.format(1.2345, math.bignumber(3)), '1.23')
+      assert.strictEqual(math.format(1.2345, { precision: math.bignumber(3) }), '1.23')
+      assert.strictEqual(math.format(math.bignumber('1.2345'), math.bignumber(3)), '1.23')
+      assert.strictEqual(math.format(math.bignumber('1.2345'), { precision: math.bignumber(3) }), '1.23')
+    })
+
+    it('should support a Bignumber as wordSize', function () {
+      const options = { notation: 'hex', wordSize: math.bignumber(32) }
+      assert.strictEqual(math.format(-830, options), '0xfffffcc2i32')
+      assert.strictEqual(math.format(math.bignumber('-830'), options), '0xfffffcc2i32')
     })
 
     describe('engineering notation', function () {
@@ -335,6 +366,30 @@ describe('format', function () {
         assert.strictEqual(math.format(bignumber('0.0000000000001234567890123456789'), { notation: 'engineering', precision: 3 }), '123e-15')
         assert.strictEqual(math.format(bignumber('0.0000000000001234567890123456789'), { notation: 'engineering', precision: 16 }), '123.4567890123457e-15')
       })
+      it('should format numbers starting with more than 3 sig figs that target 1 or 2 sig figs', function () {
+        assert.strictEqual(math.format(bignumber(0.333333333333333), { notation: 'engineering', precision: 1 }), '300e-3')
+        assert.strictEqual(math.format(bignumber(0.333333333333333), { notation: 'engineering', precision: 2 }), '330e-3')
+        assert.strictEqual(math.format(bignumber(33.33333333333), { notation: 'engineering', precision: 1 }), '30e+0')
+        assert.strictEqual(math.format(bignumber(333.33333333333), { notation: 'engineering', precision: 2 }), '330e+0')
+        assert.strictEqual(math.format(bignumber(333333.333333333), { notation: 'engineering', precision: 1 }), '300e+3')
+        assert.strictEqual(math.format(bignumber(777777.77777777), { notation: 'engineering', precision: 1 }), '800e+3')
+        assert.strictEqual(math.format(bignumber(777777.77777777), { notation: 'engineering', precision: 2 }), '780e+3')
+        assert.strictEqual(math.format(bignumber(-0.000000000777777), { notation: 'engineering', precision: 2 }), '-780e-12')
+      })
+
+      it('should support BigNumber lowerExp and upperExp', function () {
+        const options = {
+          lowerExp: math.bignumber('-2'),
+          upperExp: math.bignumber('2')
+        }
+        assert.strictEqual(format(1, options), '1')
+        assert.strictEqual(format(1e-1, options), '0.1')
+        assert.strictEqual(format(1e-2, options), '0.01')
+        assert.strictEqual(format(1e-3, options), '1e-3')
+        assert.strictEqual(format(1e1, options), '10')
+        assert.strictEqual(format(1e2, options), '1e+2')
+        assert.strictEqual(format(1e3, options), '1e+3')
+      })
     })
 
     describe('non decimal base formatting', function () {
@@ -357,7 +412,7 @@ describe('format', function () {
     })
   })
 
-  it('should format expressions', () => {
+  it('should format expressions', function () {
     assert.strictEqual(math.format(math.parse('0.3333'), { precision: 1 }), '0.3')
     assert.strictEqual(math.format(math.parse('0.3333 + [0.4444]'), { precision: 1 }), '0.3 + [0.4]')
 

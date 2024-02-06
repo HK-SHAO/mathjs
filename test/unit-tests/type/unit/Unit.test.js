@@ -20,10 +20,12 @@ describe('Unit', function () {
       unit1 = new Unit(null, 'kg')
       assert.strictEqual(unit1.value, null)
       assert.strictEqual(unit1.units[0].unit.name, 'g')
+      assert.strictEqual(unit1.valueType(), 'null')
 
       unit1 = new Unit(10, 'Hz')
       assert.strictEqual(unit1.value, 10)
       assert.strictEqual(unit1.units[0].unit.name, 'Hz')
+      assert.strictEqual(unit1.valueType(), 'number')
 
       unit1 = new Unit(9.81, 'kg m/s^2')
       assert.strictEqual(unit1.value, 9.81)
@@ -36,18 +38,21 @@ describe('Unit', function () {
       const unit1 = new Unit(math.fraction(1000, 3), 'cm')
       assert.deepStrictEqual(unit1.value, math.fraction(10, 3))
       assert.strictEqual(unit1.units[0].unit.name, 'm')
+      assert.strictEqual(unit1.valueType(), 'Fraction')
     })
 
     it('should create a unit with BigNumber value', function () {
       const unit1 = new Unit(math.bignumber(5000), 'cm')
       assert.deepStrictEqual(unit1.value, math.bignumber(50))
       assert.strictEqual(unit1.units[0].unit.name, 'm')
+      assert.strictEqual(unit1.valueType(), 'BigNumber')
     })
 
     it('should create a unit with Complex value', function () {
       const unit1 = new Unit(math.complex(500, 600), 'cm')
       assert.deepStrictEqual(unit1.value, math.complex(5, 6))
       assert.strictEqual(unit1.units[0].unit.name, 'm')
+      assert.strictEqual(unit1.valueType(), 'Complex')
     })
 
     it('should create square meter correctly', function () {
@@ -60,6 +65,21 @@ describe('Unit', function () {
       const unit1 = new Unit(0.000000001, 'km3')
       assert.strictEqual(unit1.value, 1)
       assert.strictEqual(unit1.units[0].unit.name, 'm3')
+    })
+
+    it('should create a unit from an existing unit', function () {
+      const unit1 = new Unit(null, 'm/s^2')
+      const unit2 = new Unit(5, unit1)
+      assert.strictEqual(unit2.value, 5)
+      assert.strictEqual(unit2.units.length, 2)
+      assert.strictEqual(unit2.units[0].unit.name, 'm')
+      assert.strictEqual(unit2.units[1].unit.name, 's')
+      assert.strictEqual(unit2.units[1].power, -2)
+    })
+
+    it('should create a unitless Unit if second parameter is undefined', function () {
+      const a = new Unit(6)
+      assert(a.dimensions.every(d => d === 0))
     })
 
     it('should ignore properties on Object.prototype', function () {
@@ -277,6 +297,21 @@ describe('Unit', function () {
       assert.strictEqual(u4.fixPrefix, true)
     })
 
+    it('should avoid round-off in offset conversions', function () {
+      assert.strictEqual(math.unit('-218.79 degC').to('degF').toString(), '-361.822 degF')
+      assert.strictEqual(math.unit('-40 degC').to('degF').toString(), '-40 degF')
+      assert.strictEqual(math.unit('32 degF').to('degC').toString(), '0 degC')
+      assert.strictEqual(math.unit('68 degF').to('degC').toString(), '20 degC')
+      assert.strictEqual(math.unit('98.6 degF').to('degC').toString(), '37 degC')
+      assert.strictEqual(math.unit('212 degF').to('degC').toString(), '100 degC')
+    })
+
+    it('should avoid bignumber round-off in offset conversions', function () {
+      assert.deepEqual(math.unit(math.bignumber(32), 'degF').toNumeric('degC'), math.bignumber(0))
+      assert.deepEqual(math.unit(math.bignumber(10.5), 'degC').toNumeric('degF'), math.bignumber(50.9))
+      assert.deepEqual(math.unit(math.bignumber(98.6), 'degF').toNumeric('degC'), math.bignumber(37))
+    })
+
     it('should convert a unit with a fraction', function () {
       const u1 = new Unit(math.fraction(1, 3), 'm')
 
@@ -358,6 +393,7 @@ describe('Unit', function () {
     it('should convert a unitless quantity', function () {
       const u = Unit.parse('5', { allowNoUnits: true })
       assert.strictEqual(u.toNumeric(), 5)
+      assert.strictEqual(u.toNumeric('mm/m'), 5000)
     })
 
     it('should convert a binary prefixes (1)', function () {
@@ -702,8 +738,8 @@ describe('Unit', function () {
     })
 
     it('should format a unit with a bignumber', function () {
-      assert.strictEqual(new Unit(math.bignumber(1).plus(1e-24), 'm').format(), '1.000000000000000000000001 m')
-      assert.strictEqual(new Unit(math.bignumber(1e24).plus(1), 'm').format(), '1.000000000000000000000001 Ym')
+      assert.strictEqual(new Unit(math.bignumber(1).plus(1e-30), 'm').format(), '1.000000000000000000000000000001 m')
+      assert.strictEqual(new Unit(math.bignumber(1e30).plus(1), 'm').format(), '1.000000000000000000000000000001 Qm')
     })
 
     it('should format a unit with a fraction', function () {
@@ -916,8 +952,6 @@ describe('Unit', function () {
     })
 
     it('should parse the value of the unit as Fraction or BigNumber when math.js is configured so', function () {
-      this.timeout(10000) // For IE tests
-
       const math2 = math.create({ number: 'Fraction' })
       const unit2 = math2.Unit.parse('5kg')
       assert(isFraction(unit2.value))
@@ -933,7 +967,17 @@ describe('Unit', function () {
       const newMm = math2.createUnit('mm', '2 A')
       assert.notDeepStrictEqual(oldMm, newMm)
       assert.deepStrictEqual(newMm, math2.Unit.parse('mm'))
-      console.log(oldMm.units, newMm.units)
+    })
+
+    it('should support prefixes on specific units', function () {
+      assert.deepStrictEqual(Unit.parse('1 nK').toNumeric('K'), 1e-9)
+      assert.deepStrictEqual(Unit.parse('1 ndegR').toNumeric('degR'), 1e-9)
+      assert.deepStrictEqual(Unit.parse('1 ndegF').toNumeric('degF'), 1e-9)
+      assert.deepStrictEqual(Unit.parse('1 ndegC').toNumeric('degC'), 1e-9)
+      assert.deepStrictEqual(Unit.parse('1 nanorankine').toNumeric('rankine'), 1e-9)
+      assert.deepStrictEqual(Unit.parse('1 nanokelvin').toNumeric('kelvin'), 1e-9)
+      assert.deepStrictEqual(Unit.parse('1 nanocelsius').toNumeric('celsius'), 1e-9)
+      assert.deepStrictEqual(Unit.parse('1 nanofahrenheit').toNumeric('fahrenheit'), 1e-9)
     })
   })
 
@@ -948,6 +992,36 @@ describe('Unit', function () {
       assert.strictEqual(Unit.parse('5 bar').toString(), '5 bar')
       assert.strictEqual(Unit.parse('5 millibar').toString(), '5 millibar')
       assert.strictEqual(Unit.parse('5 mbar').toString(), '5 mbar')
+    })
+  })
+
+  describe('metric prefixes adopted by BIPM in 2022: Q(uetta), R(onna), r(onto), and q(uecto)', function () {
+    it('should accept long prefixes', function () {
+      assert.strictEqual(new Unit(math.bignumber(1e30), 'meter').format(), '1 quettameter')
+      assert.strictEqual(new Unit(math.bignumber(1e27), 'meter').format(), '1 ronnameter')
+      assert.strictEqual(new Unit(math.bignumber(1e-27), 'meter').format(), '1 rontometer')
+      assert.strictEqual(new Unit(math.bignumber(1e-30), 'meter').format(), '1 quectometer')
+    })
+
+    it('should accept short prefixes', function () {
+      assert.strictEqual(new Unit(math.bignumber(1e30), 'm').format(), '1 Qm')
+      assert.strictEqual(new Unit(math.bignumber(1e27), 'm').format(), '1 Rm')
+      assert.strictEqual(new Unit(math.bignumber(1e-27), 'm').format(), '1 rm')
+      assert.strictEqual(new Unit(math.bignumber(1e-30), 'm').format(), '1 qm')
+    })
+
+    it('should create square meter correctly', function () {
+      assert.strictEqual(new Unit(math.bignumber(1e60), 'm2').format(), '1 Qm2')
+      assert.strictEqual(new Unit(math.bignumber(1e54), 'm2').format(), '1 Rm2')
+      assert.strictEqual(new Unit(math.bignumber(1e-54), 'm2').format(), '1 rm2')
+      assert.strictEqual(new Unit(math.bignumber(1e-60), 'm2').format(), '1 qm2')
+    })
+
+    it('should create cubic meter correctly', function () {
+      assert.strictEqual(new Unit(math.bignumber(1e90), 'm3').format(), '1 Qm3')
+      assert.strictEqual(new Unit(math.bignumber(1e81), 'm3').format(), '1 Rm3')
+      assert.strictEqual(new Unit(math.bignumber(1e-81), 'm3').format(), '1 rm3')
+      assert.strictEqual(new Unit(math.bignumber(1e-90), 'm3').format(), '1 qm3')
     })
   })
 
@@ -1009,6 +1083,25 @@ describe('Unit', function () {
       const unit5 = new Unit(math.bignumber(1), 'N h/s')
       const unitP = unit5.pow(math.bignumber(-3.5))
       assert(math.isBigNumber(unitP.value))
+    })
+
+    it('should multiply/divide units with offsets correctly', function () {
+      const unit1 = new Unit(1, 'm')
+      const unit2 = new Unit(1, 'degC')
+      const unit3 = new Unit(1, 'm degC')
+      unit3.skipAutomaticSimplification = false
+      assert.deepStrictEqual(unit1.multiply(unit2), unit3)
+      const unit4 = new Unit(1, 'in')
+      const unit5 = new Unit(1, 'degF')
+      const unit6 = new Unit(1, 'in/degF')
+      unit6.skipAutomaticSimplification = false
+      assert.deepStrictEqual(unit4.divide(unit5), unit6)
+    })
+
+    // eslint-disable-next-line mocha/no-skipped-tests
+    it.skip('should cancel units in numerator and denominator', function () {
+      assert.strictEqual(math.evaluate('2 J/K/g * 2 g').toString(), '4 J / K')
+      assert.strictEqual(math.evaluate('2 J/K/g * 2K').toString(), '4 J / g')
     })
   })
 
@@ -1132,7 +1225,9 @@ describe('Unit', function () {
 
     it('should create a custom unit from a configuration object', function () {
       Unit.createUnitSingle('wiggle', { definition: '4 rad^2/s', offset: 1, prefixes: 'long' })
-      assert.strictEqual(math.evaluate('8000 rad^2/s').toString(), '1 kilowiggle')
+      assert.strictEqual(math.evaluate('8000 rad^2/s').toString(), '2 kilowiggle')
+      Unit.createUnitSingle('wriggle', { definition: '4 rad^2/s', offset: 0, prefixes: 'long' })
+      assert.strictEqual(math.evaluate('2 wriggle to wiggle').toString(), '1 wiggle')
     })
 
     it('should return the new (value-less) unit', function () {
@@ -1262,6 +1357,7 @@ describe('Unit', function () {
       assert.strictEqual(Unit.parse('3 ft').toSI().format(10), '0.9144 m')
       assert.strictEqual(Unit.parse('0.111 ft^2').toSI().format(10), '0.01031223744 m^2')
       assert.strictEqual(Unit.parse('1 kgf').toSI().toString(), '9.80665 (kg m) / s^2')
+      assert.strictEqual(Unit.parse('300 degC').toSI().toString(), '573.15 K')
     })
 
     it('should return SI units for valueless units', function () {

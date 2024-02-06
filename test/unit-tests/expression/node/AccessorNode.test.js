@@ -32,7 +32,7 @@ describe('AccessorNode', function () {
   })
 
   it('should throw an error when calling without new operator', function () {
-    assert.throws(function () { AccessorNode(new Node(), new IndexNode([])) }, SyntaxError)
+    assert.throws(() => AccessorNode(new Node(), new IndexNode([])), TypeError)
   })
 
   it('should get the name of an AccessorNode', function () {
@@ -74,6 +74,27 @@ describe('AccessorNode', function () {
       a: [[1, 2], [3, 4]]
     }
     assert.deepStrictEqual(expr.evaluate(scope), [[3, 4]])
+  })
+
+  it('should compile a AccessorNode with "end" in an expression', function () {
+    const a = new SymbolNode('a')
+    const index = new IndexNode([
+      new OperatorNode(
+        '-',
+        'subtract',
+        [
+          new SymbolNode('end'),
+          new ConstantNode(2)
+        ]
+      )
+    ])
+    const n = new AccessorNode(a, index)
+    const expr = n.compile()
+
+    const scope = {
+      a: [1, 2, 3, 4]
+    }
+    assert.deepStrictEqual(expr.evaluate(scope), 2)
   })
 
   it('should compile a AccessorNode with a property', function () {
@@ -183,6 +204,46 @@ describe('AccessorNode', function () {
       a: [[1, 2], [3, 4]]
     }
     assert.deepStrictEqual(expr.evaluate(scope), [[3, 4]])
+  })
+
+  it('should use the inner context when using "end" in a nested index', function () {
+    // A[B[end]]
+    const node = new AccessorNode(
+      new SymbolNode('A'),
+      new IndexNode([
+        new AccessorNode(
+          new SymbolNode('B'),
+          new IndexNode([
+            new SymbolNode('end')
+          ])
+        )
+      ])
+    )
+
+    // here, end should resolve to the end of B, which is 3 (whilst the end of A is 6)
+    const expr = node.compile()
+    const scope = {
+      A: [4, 5, 6, 7, 8, 9],
+      B: [1, 2, 3]
+    }
+    assert.deepStrictEqual(expr.evaluate(scope), 6)
+  })
+
+  it('should give a proper error message when using "end" inside the index of an object', function () {
+    const obj = new SymbolNode('value')
+    const index = new IndexNode([
+      new SymbolNode('end')
+    ])
+    const n = new AccessorNode(obj, index)
+    const expr = n.compile()
+
+    assert.throws(function () {
+      expr.evaluate({ value: { end: true } })
+    }, /TypeError: Cannot resolve "end": context must be a Matrix, Array, or string but is Object/)
+
+    assert.throws(function () {
+      expr.evaluate({ value: 42 })
+    }, /TypeError: Cannot resolve "end": context must be a Matrix, Array, or string but is number/)
   })
 
   it('should compile a AccessorNode with bignumber setting', function () {
@@ -452,6 +513,30 @@ describe('AccessorNode', function () {
     const n = new AccessorNode(a, new IndexNode([b, c]))
 
     assert.strictEqual(n.toTex({ handler: customFunction }), ' a at const\\left(1, number\\right), const\\left(2, number\\right), ')
+  })
+
+  it('should stringify an AccessorNode with custom toHTML', function () {
+    // Also checks if the custom functions get passed on to the children
+    const customFunction = function (node, options) {
+      if (node.type === 'AccessorNode') {
+        let latex = node.object.toHTML(options) + ' at '
+        node.index.dimensions.forEach(function (range) {
+          latex += range.toHTML(options) + ', '
+        })
+
+        return latex
+      } else if (node.type === 'ConstantNode') {
+        return 'const(' + node.value + ', ' + math.typeOf(node.value) + ')'
+      }
+    }
+
+    const a = new SymbolNode('a')
+    const b = new ConstantNode(1)
+    const c = new ConstantNode(2)
+
+    const n = new AccessorNode(a, new IndexNode([b, c]))
+
+    assert.strictEqual(n.toHTML({ handler: customFunction }), '<span class="math-symbol">a</span> at const(1, number), const(2, number), ')
   })
 
   it('toJSON and fromJSON', function () {

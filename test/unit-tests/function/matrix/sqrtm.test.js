@@ -61,7 +61,7 @@ describe('sqrtm', function () {
 
   it('should LaTeX sqrtm', function () {
     const expression = math.parse('sqrtm([[33, 24], [48, 57]])')
-    assert.strictEqual(expression.toTex(), '{\\begin{bmatrix}33&24\\\\48&57\\\\\\end{bmatrix}}^{\\frac{1}{2}}')
+    assert.strictEqual(expression.toTex(), '{\\begin{bmatrix}33&24\\\\48&57\\end{bmatrix}}^{\\frac{1}{2}}')
   })
 
   it('should return the result in the same format as the input', function () {
@@ -70,9 +70,9 @@ describe('sqrtm', function () {
     assert.strictEqual(math.typeOf(math.sqrtm(AA)), 'Array')
     assert.strictEqual(math.typeOf(math.sqrtm(BB)), 'Array')
 
-    assert.strictEqual(math.typeOf(math.sqrtm(math.matrix(A))), 'Matrix')
-    assert.strictEqual(math.typeOf(math.sqrtm(math.matrix(B))), 'Matrix')
-    assert.strictEqual(math.typeOf(math.sqrtm(math.matrix(AA))), 'Matrix')
-    assert.strictEqual(math.typeOf(math.sqrtm(math.matrix(BB))), 'Matrix')
+    assert.strictEqual(math.typeOf(math.sqrtm(math.matrix(A))), 'DenseMatrix')
+    assert.strictEqual(math.typeOf(math.sqrtm(math.matrix(B))), 'DenseMatrix')
+    assert.strictEqual(math.typeOf(math.sqrtm(math.matrix(AA))), 'DenseMatrix')
+    assert.strictEqual(math.typeOf(math.sqrtm(math.matrix(BB))), 'DenseMatrix')
   })
 })

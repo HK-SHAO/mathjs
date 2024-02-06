@@ -33,6 +33,10 @@ describe('to', function () {
       approx.deepEqual(math.to([[unit('1cm'), unit('2 inch')], [unit('2km'), unit('1 foot')]], [[unit('foot'), unit('foot')], [unit('cm'), unit('foot')]]), [[unit('1cm').to('foot'), unit('2 inch').to('foot')], [unit('2km').to('cm'), unit('1 foot').to('foot')]])
     })
 
+    it('should perform the given unit conversion, between broadcastable arrays', function () {
+      approx.deepEqual(math.to([unit('1 cm'), unit('2 inch')], [[unit('foot')], [unit('cm')]]), [[unit('1cm').to('foot'), unit('2 inch').to('foot')], [unit('1cm').to('cm'), unit('2 inch').to('cm')]])
+    })
+
     it('should perform the given unit conversion, array - dense matrix', function () {
       approx.deepEqual(math.to([[unit('1cm'), unit('2 inch')], [unit('2km'), unit('1 foot')]], matrix([[unit('foot'), unit('foot')], [unit('cm'), unit('foot')]])), matrix([[unit('1cm').to('foot'), unit('2 inch').to('foot')], [unit('2km').to('cm'), unit('1 foot').to('foot')]]))
     })
@@ -70,7 +74,7 @@ describe('to', function () {
 
   it('should throw an error if called with a number', function () {
     assert.throws(function () { math.to(5, unit('m')) }, TypeError)
-    assert.throws(function () { math.to(unit('5cm'), 2) }, /SyntaxError: "2" contains no units/)
+    assert.throws(function () { math.to(unit('5cm'), 2) }, TypeError)
   })
 
   it('should throw an error if called with a string', function () {

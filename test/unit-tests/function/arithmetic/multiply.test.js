@@ -169,6 +169,11 @@ describe('multiply', function () {
       assert.strictEqual(multiply(unit(math.complex(3, -4), 'N'), unit(math.complex(7, -2), 'm')).toString(), '(13 - 34i) J')
     })
 
+    it('should evaluate a complicated unit multiplication', function () {
+      const v1 = math.evaluate('0.1 kg/s * 4.2 J/degC/g * 5 degC')
+      approx.equal(v1.value, 2100)
+    })
+
     it('should multiply valueless units correctly', function () {
       assert.strictEqual(multiply(unit('m'), unit('4 m')).toString(), '4 m^2')
       assert.strictEqual(multiply(unit('ft'), unit('4 ft')).format(5), '4 ft^2')
@@ -178,6 +183,7 @@ describe('multiply', function () {
     })
 
     // TODO: cleanup once decided to not downgrade BigNumber to number
+    // eslint-disable-next-line mocha/no-skipped-tests
     it.skip('should multiply a bignumber and a unit correctly', function () {
       assert.strictEqual(multiply(bignumber(2), unit('5 mm')).toString(), '10 mm')
       assert.strictEqual(multiply(bignumber(2), unit('5 mm')).toString(), '10 mm')
@@ -186,6 +192,7 @@ describe('multiply', function () {
     })
 
     // TODO: cleanup once decided to not downgrade BigNumber to number
+    // eslint-disable-next-line mocha/no-skipped-tests
     it.skip('should multiply a bignumber and a unit without value correctly', function () {
       assert.strictEqual(multiply(bignumber(2), unit('mm')).toString(), '2 mm')
       assert.strictEqual(multiply(bignumber(2), unit('km')).toString(), '2 km')
@@ -865,6 +872,26 @@ describe('multiply', function () {
       assert.deepStrictEqual(multiply(math.matrix([[2, 2], [2, 2]]), math.matrix([[3, 3], [3, 3]]), math.matrix([[4, 4], [4, 4]])), math.matrix([[96, 96], [96, 96]]))
       assert.deepStrictEqual(multiply(math.matrix([[2, 2], [2, 2]]), math.matrix([[3, 3], [3, 3]]), 4), math.matrix([[48, 48], [48, 48]]))
       assert.deepStrictEqual(multiply(math.matrix([[2, 2], [2, 2]]), 3, 4), math.matrix([[24, 24], [24, 24]]))
+    })
+  })
+
+  describe('immutable operations', function () {
+    it('should not mutate the input (arrays)', function () {
+      const a = Object.freeze([[1, 2], [3, 4]])
+      const b = Object.freeze([[5, 6], [7, 8]])
+
+      assert.deepStrictEqual(multiply(a, b), [[19, 22], [43, 50]])
+      assert.deepStrictEqual(a, [[1, 2], [3, 4]])
+      assert.deepStrictEqual(b, [[5, 6], [7, 8]])
+    })
+
+    it('should not mutate the input (arrays with nested Matrices)', function () {
+      const a = Object.freeze([math.matrix([1, 2]), math.matrix([3, 4])])
+      const b = Object.freeze([math.matrix([5, 6]), math.matrix([7, 8])])
+
+      assert.deepStrictEqual(multiply(a, b), [[19, 22], [43, 50]])
+      assert.deepStrictEqual(a, [math.matrix([1, 2]), math.matrix([3, 4])])
+      assert.deepStrictEqual(b, [math.matrix([5, 6]), math.matrix([7, 8])])
     })
   })
 

@@ -11,10 +11,35 @@ describe('fraction', function () {
     equalFraction(math.fraction(null), new Fraction(0))
   })
 
+  it('should create a fraction from an irrational number', function () {
+    equalFraction(math.fraction(math.pi), new Fraction(11985110, 3814979))
+  })
+
+  it('should fail to create a fraction in case of non-integer quotient', function () {
+    assert.throws(() => math.fraction(4, 5.1), /Parameters must be integer/)
+    assert.throws(() => math.fraction(62.8, 10), /Parameters must be integer/)
+    assert.throws(() => math.fraction(Infinity, 3), /Parameters must be integer/)
+  })
+
+  it('should create a fraction from a quotient regardless of integrality', function () {
+    equalFraction(math.divide(math.fraction(4), math.fraction(5.1)),
+      math.fraction(40, 51))
+  })
+
   it('should create a fraction from a BigNumber', function () {
     const b = math.bignumber(2).div(3)
     const f = math.fraction(b)
     equalFraction(f, new Fraction('0.6666666666666666666666666666666666666666666666666666666666666667'))
+  })
+
+  it('should convert the number value of a Unit to Fraction', function () {
+    equalFraction(math.fraction(math.unit(0.5, 'cm')).toNumeric('cm'), new Fraction(1, 2))
+    equalFraction(math.fraction(math.unit(10, 'inch')).toNumeric('cm'), new Fraction(127, 5))
+  })
+
+  it('should convert the BigNumber value of a Unit to Fraction', function () {
+    equalFraction(math.fraction(math.unit(math.bignumber(0.5), 'cm')).toNumeric('cm'), new Fraction(1, 2))
+    equalFraction(math.fraction(math.unit(math.bignumber(10), 'inch')).toNumeric('cm'), new Fraction(127, 5))
   })
 
   it('should clone a fraction', function () {

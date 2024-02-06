@@ -98,13 +98,6 @@ export const createNorm = /* #__PURE__ */ factory(
         return _norm(x, 2)
       },
 
-      'number | Complex | BigNumber | boolean, number | BigNumber | string': function (
-        x
-      ) {
-        // ignore second parameter, TODO: remove the option of second parameter for these types
-        return this(x)
-      },
-
       'Array, number | BigNumber | string': function (x, p) {
         return _norm(matrix(x), p)
       },
@@ -239,8 +232,8 @@ export const createNorm = /* #__PURE__ */ factory(
       }
       const tx = ctranspose(x)
       const squaredX = multiply(tx, x)
-      const eigenVals = eigs(squaredX).values
-      const rho = eigenVals.get([eigenVals.size()[0] - 1])
+      const eigenVals = eigs(squaredX).values.toArray()
+      const rho = eigenVals[eigenVals.length - 1]
       return abs(sqrt(rho))
     }
 

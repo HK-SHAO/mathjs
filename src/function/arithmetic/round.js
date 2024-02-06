@@ -1,9 +1,8 @@
 import { factory } from '../../utils/factory.js'
 import { deepMap } from '../../utils/collection.js'
-import { isInteger } from '../../utils/number.js'
-import { createAlgorithm11 } from '../../type/matrix/utils/algorithm11.js'
-import { createAlgorithm12 } from '../../type/matrix/utils/algorithm12.js'
-import { createAlgorithm14 } from '../../type/matrix/utils/algorithm14.js'
+import { createMatAlgo11xS0s } from '../../type/matrix/utils/matAlgo11xS0s.js'
+import { createMatAlgo12xSfs } from '../../type/matrix/utils/matAlgo12xSfs.js'
+import { createMatAlgo14xDs } from '../../type/matrix/utils/matAlgo14xDs.js'
 import { roundNumber } from '../../plain/number/index.js'
 
 const NO_INT = 'Number of decimals in function round must be an integer'
@@ -19,18 +18,20 @@ const dependencies = [
 ]
 
 export const createRound = /* #__PURE__ */ factory(name, dependencies, ({ typed, matrix, equalScalar, zeros, BigNumber, DenseMatrix }) => {
-  const algorithm11 = createAlgorithm11({ typed, equalScalar })
-  const algorithm12 = createAlgorithm12({ typed, DenseMatrix })
-  const algorithm14 = createAlgorithm14({ typed })
+  const matAlgo11xS0s = createMatAlgo11xS0s({ typed, equalScalar })
+  const matAlgo12xSfs = createMatAlgo12xSfs({ typed, DenseMatrix })
+  const matAlgo14xDs = createMatAlgo14xDs({ typed })
 
   /**
-   * Round a value towards the nearest integer.
+   * Round a value towards the nearest rounded value.
    * For matrices, the function is evaluated element wise.
    *
    * Syntax:
    *
    *    math.round(x)
    *    math.round(x, n)
+   *    math.round(unit, valuelessUnit)
+   *    math.round(unit, n, valuelessUnit)
    *
    * Examples:
    *
@@ -48,18 +49,33 @@ export const createRound = /* #__PURE__ */ factory(name, dependencies, ({ typed,
    *    const c = math.complex(3.2, -2.7)
    *    math.round(c)                // returns Complex 3 - 3i
    *
+   *    const unit = math.unit('3.241 cm')
+   *    const cm = math.unit('cm')
+   *    const mm = math.unit('mm')
+   *    math.round(unit, 1, cm)      // returns Unit 3.2 cm
+   *    math.round(unit, 1, mm)      // returns Unit 32.4 mm
+   *
    *    math.round([3.2, 3.8, -4.7]) // returns Array [3, 4, -5]
    *
    * See also:
    *
    *    ceil, fix, floor
    *
-   * @param  {number | BigNumber | Fraction | Complex | Array | Matrix} x  Number to be rounded
+   * @param  {number | BigNumber | Fraction | Complex | Unit | Array | Matrix} x  Value to be rounded
    * @param  {number | BigNumber | Array} [n=0]                            Number of decimals
+   * @param  {Unit} [valuelessUnit]                                        A valueless unit
    * @return {number | BigNumber | Fraction | Complex | Array | Matrix} Rounded value
    */
   return typed(name, {
-    ...roundNumberSignatures,
+    number: roundNumber,
+
+    'number, number': roundNumber,
+
+    'number, BigNumber': function (x, n) {
+      if (!n.isInteger()) { throw new TypeError(NO_INT) }
+
+      return new BigNumber(x).toDecimalPlaces(n.toNumber())
+    },
 
     Complex: function (x) {
       return x.round()
@@ -76,12 +92,6 @@ export const createRound = /* #__PURE__ */ factory(name, dependencies, ({ typed,
 
       const _n = n.toNumber()
       return x.round(_n)
-    },
-
-    'number, BigNumber': function (x, n) {
-      if (!n.isInteger()) { throw new TypeError(NO_INT) }
-
-      return new BigNumber(x).toDecimalPlaces(n.toNumber())
     },
 
     BigNumber: function (x) {
@@ -103,60 +113,68 @@ export const createRound = /* #__PURE__ */ factory(name, dependencies, ({ typed,
       return x.round(n)
     },
 
-    'Array | Matrix': function (x) {
+    'Fraction, BigNumber': function (x, n) {
+      if (!n.isInteger()) { throw new TypeError(NO_INT) }
+      return x.round(n.toNumber())
+    },
+
+    'Unit, number, Unit': typed.referToSelf(self => function (x, n, unit) {
+      const valueless = x.toNumeric(unit)
+      return unit.multiply(self(valueless, n))
+    }),
+
+    'Unit, BigNumber, Unit': typed.referToSelf(self => (x, n, unit) => self(x, n.toNumber(), unit)),
+
+    'Unit, Unit': typed.referToSelf(self => (x, unit) => self(x, 0, unit)),
+
+    'Array | Matrix, number, Unit': typed.referToSelf(self => (x, n, unit) => {
       // deep map collection, skip zeros since round(0) = 0
-      return deepMap(x, this, true)
-    },
+      return deepMap(x, (value) => self(value, n, unit), true)
+    }),
 
-    'SparseMatrix, number | BigNumber': function (x, y) {
-      return algorithm11(x, y, this, false)
-    },
+    'Array | Matrix, BigNumber, Unit': typed.referToSelf(self => (x, n, unit) => self(x, n.toNumber(), unit)),
 
-    'DenseMatrix, number | BigNumber': function (x, y) {
-      return algorithm14(x, y, this, false)
-    },
+    'Array | Matrix, Unit': typed.referToSelf(self => (x, unit) => self(x, 0, unit)),
 
-    'number | Complex | BigNumber, SparseMatrix': function (x, y) {
+    'Array | Matrix': typed.referToSelf(self => x => {
+      // deep map collection, skip zeros since round(0) = 0
+      return deepMap(x, self, true)
+    }),
+
+    'SparseMatrix, number | BigNumber': typed.referToSelf(self => (x, n) => {
+      return matAlgo11xS0s(x, n, self, false)
+    }),
+
+    'DenseMatrix, number | BigNumber': typed.referToSelf(self => (x, n) => {
+      return matAlgo14xDs(x, n, self, false)
+    }),
+
+    'Array, number | BigNumber': typed.referToSelf(self => (x, n) => {
+      // use matrix implementation
+      return matAlgo14xDs(matrix(x), n, self, false).valueOf()
+    }),
+
+    'number | Complex | BigNumber | Fraction, SparseMatrix': typed.referToSelf(self => (x, n) => {
       // check scalar is zero
       if (equalScalar(x, 0)) {
         // do not execute algorithm, result will be a zero matrix
-        return zeros(y.size(), y.storage())
+        return zeros(n.size(), n.storage())
       }
-      return algorithm12(y, x, this, true)
-    },
+      return matAlgo12xSfs(n, x, self, true)
+    }),
 
-    'number | Complex | BigNumber, DenseMatrix': function (x, y) {
+    'number | Complex | BigNumber | Fraction, DenseMatrix': typed.referToSelf(self => (x, n) => {
       // check scalar is zero
       if (equalScalar(x, 0)) {
         // do not execute algorithm, result will be a zero matrix
-        return zeros(y.size(), y.storage())
+        return zeros(n.size(), n.storage())
       }
-      return algorithm14(y, x, this, true)
-    },
+      return matAlgo14xDs(n, x, self, true)
+    }),
 
-    'Array, number | BigNumber': function (x, y) {
+    'number | Complex | BigNumber | Fraction, Array': typed.referToSelf(self => (x, n) => {
       // use matrix implementation
-      return algorithm14(matrix(x), y, this, false).valueOf()
-    },
-
-    'number | Complex | BigNumber, Array': function (x, y) {
-      // use matrix implementation
-      return algorithm14(matrix(y), x, this, true).valueOf()
-    }
+      return matAlgo14xDs(matrix(n), x, self, true).valueOf()
+    })
   })
-})
-
-const roundNumberSignatures = {
-  number: roundNumber,
-
-  'number, number': function (x, n) {
-    if (!isInteger(n)) { throw new TypeError(NO_INT) }
-    if (n < 0 || n > 15) { throw new Error('Number of decimals in function round must be in te range of 0-15') }
-
-    return roundNumber(x, n)
-  }
-}
-
-export const createRoundNumber = /* #__PURE__ */ factory(name, ['typed'], ({ typed }) => {
-  return typed(name, roundNumberSignatures)
 })

@@ -7,10 +7,12 @@ Math.js is an extensive math library for JavaScript and Node.js. It features a f
 [![Version](https://img.shields.io/npm/v/mathjs.svg)](https://www.npmjs.com/package/mathjs)
 [![Downloads](https://img.shields.io/npm/dm/mathjs.svg)](https://www.npmjs.com/package/mathjs)
 [![Build Status](https://github.com/josdejong/mathjs/workflows/Node.js%20CI/badge.svg)](https://github.com/josdejong/mathjs/actions)
-[![Maintenance](https://img.shields.io/maintenance/yes/2021.svg)](https://github.com/josdejong/mathjs/graphs/commit-activity)
+[![Maintenance](https://img.shields.io/maintenance/yes/2024.svg)](https://github.com/josdejong/mathjs/graphs/commit-activity)
 [![License](https://img.shields.io/github/license/josdejong/mathjs.svg)](https://github.com/josdejong/mathjs/blob/master/LICENSE)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fjosdejong%2Fmathjs.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fjosdejong%2Fmathjs?ref=badge_shield)
 [![Codecov](https://codecov.io/gh/josdejong/mathjs/branch/develop/graph/badge.svg)](https://codecov.io/gh/josdejong/mathjs)
+[![Github Sponsor](https://img.shields.io/github/sponsors/josdejong
+)](https://github.com/sponsors/josdejong)
 
 ## Features
 
@@ -31,8 +33,6 @@ Math.js can be used in both node.js and in the browser.
 Install math.js using [npm](https://www.npmjs.com/package/mathjs):
 
     npm install mathjs
-
-> Note that when using mathjs in a TypeScript project, you will have to install type definition files too: `npm install @types/mathjs`.
 
 Or download mathjs via one of the CDN's listed on the downloads page:
 
@@ -76,7 +76,7 @@ See the [Getting Started](https://mathjs.org/docs/getting_started.html) for a mo
 
 ## Browser support
 
-Math.js works on any ES5 compatible JavaScript engine: node.js, Chrome, Firefox, Safari, Edge, and IE11.
+Math.js works on any ES6 compatible JavaScript engine, including node.js, Chrome, Firefox, Safari, and Edge.
 
 
 ## Documentation
@@ -91,7 +91,7 @@ Math.js works on any ES5 compatible JavaScript engine: node.js, Chrome, Firefox,
 
 First clone the project from github:
 
-    git clone git://github.com/josdejong/mathjs.git
+    git clone git@github.com:josdejong/mathjs.git
     cd mathjs
 
 Install the project dependencies:
@@ -128,6 +128,18 @@ The solution that mathjs uses has two main ingredients:
 
 At the lowest level, mathjs has immutable factory functions which create immutable functions. The core function `math.create(...)` creates a new instance having functions created from all passed factory functions. A mathjs instance is a collection of created functions. It contains a function like `math.import` to allow extending the instance with new functions, which can then be used in the expression parser.
 
+### Implementing a new function
+
+A common case is to implement a new function. This involves the following steps:
+
+- Implement the function in the right category, for example `./src/function/arithmetic/myNewFunction.js`, where you can replace `arithmetic` with the proper category, and `myNewFunction` with the name of the new function. Add the new function to the index files `./src/factoriesAny.js` and possibly `./src/factoriesNumber.js`.
+- Write documentation on the function in the source code comment of `myNewFunction.js`. This documentation is used to auto generate documentation on the website.
+- Write embedded documentation for the new function in `./src/expression/embeddedDocs/function/arithmetic/myNewFunction.js`. Add the new documentation to the index file `./src/expression/embeddedDocs/embeddedDocs.js`.
+- Write unit tests for the function in `./test/unit-tests/function/arithmetic/myNewFunction.test.js`.
+- Write the necessary TypeScript definitions for the new function in `./types/index.d.ts`, and write tests for it in `./test/typescript-tests/testTypes.ts`. This is described in [./types/EXPLANATION.md](./types/EXPLANATION.md).
+- Ensure the code style is ok by running `npm run lint` (run `npm run format` to fix the code style automatically).
+
+
 ### Build scripts
 
 The build script currently generates two types of output:
@@ -156,6 +168,14 @@ To run the tests remotely on BrowserStack, first set the environment variables `
 
     npm run test:browserstack
 
+You can separately run the code linter, though it is also executed with `npm test`:
+
+    npm run lint
+
+To automatically fix linting issue, run:
+
+    npm run format
+
 To test code coverage of the tests:
 
     npm run coverage
@@ -167,7 +187,7 @@ To see the coverage results, open the generated report in your browser:
 
 ### Continuous integration testing
 
-Continuous integration tests are run on [Github Actions](https://github.com/josdejong/mathjs/actions) and [BrowserStack](https://www.browserstack.com) every time a commit is pushed to github. Github Actions runs the tests for different versions of node.js, and BrowserStack runs the tests are run on all major browsers.
+Continuous integration tests are run on [Github Actions](https://github.com/josdejong/mathjs/actions) and [BrowserStack](https://www.browserstack.com) every time a commit is pushed to github. Github Actions runs the tests for different versions of node.js, and BrowserStack runs the tests on all major browsers.
 
 [![BrowserStack](https://raw.github.com/josdejong/mathjs/master/misc/browserstack.png)](https://www.browserstack.com)
 
@@ -175,7 +195,7 @@ Thanks Github Actions and BrowserStack for the generous free hosting of this ope
 
 ## License
 
-Copyright (C) 2013-2021 Jos de Jong <wjosdejong@gmail.com>
+Copyright (C) 2013-2024 Jos de Jong <wjosdejong@gmail.com>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

@@ -1,4 +1,3 @@
-
 // util functions
 export {
   isAccessorNode,
@@ -34,6 +33,7 @@ export {
   isParenthesisNode,
   isRange,
   isRangeNode,
+  isRelationalNode,
   isRegExp,
   isResultSet,
   isSparseMatrix,

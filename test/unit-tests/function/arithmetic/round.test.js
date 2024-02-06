@@ -4,10 +4,12 @@ import assert from 'assert'
 import approx from '../../../../tools/approx.js'
 import math from '../../../../src/defaultInstance.js'
 const bignumber = math.bignumber
+const complex = math.complex
 const fraction = math.fraction
 const matrix = math.matrix
 const sparse = math.sparse
 const round = math.round
+const unit = math.unit
 
 describe('round', function () {
   it('should round a number to te given number of decimals', function () {
@@ -42,15 +44,15 @@ describe('round', function () {
   })
 
   it('should throw an error on invalid value of n', function () {
-    assert.throws(function () { round(math.pi, -2) }, /Number of decimals in function round must be in te range of 0-15/)
-    assert.throws(function () { round(math.pi, 20) }, /Number of decimals in function round must be in te range of 0-15/)
+    assert.throws(function () { round(math.pi, -2) }, /Number of decimals in function round must be .* 0 .* 15/)
+    assert.throws(function () { round(math.pi, 20) }, /Number of decimals in function round must be .* 0 .* 15/)
     assert.throws(function () { round(math.pi, 2.5) }, /Number of decimals in function round must be an integer/)
-    assert.throws(function () { round(1, 1.2) }, /TypeError: Number of decimals in function round must be an integer/)
-    assert.throws(function () { round(1, bignumber(1.2)) }, /TypeError: Number of decimals in function round must be an integer/)
-    assert.throws(function () { round(math.complex(1, 1), 1.2) }, /TypeError: Number of decimals in function round must be an integer/)
-    assert.throws(function () { round(math.complex(1, 1), bignumber(1.2)) }, /TypeError: Number of decimals in function round must be an integer/)
-    assert.throws(function () { round(bignumber(1.2), bignumber(1.2)) }, /TypeError: Number of decimals in function round must be an integer/)
-    assert.throws(function () { round(round(fraction('1/2'), 1.2)) }, /TypeError: Number of decimals in function round must be an integer/)
+    assert.throws(function () { round(1, 1.2) }, /Error: Number of decimals in function round must be an integer/)
+    assert.throws(function () { round(1, bignumber(1.2)) }, /Error: Number of decimals in function round must be an integer/)
+    assert.throws(function () { round(complex(1, 1), 1.2) }, /Error: Number of decimals in function round must be an integer/)
+    assert.throws(function () { round(complex(1, 1), bignumber(1.2)) }, /Error: Number of decimals in function round must be an integer/)
+    assert.throws(function () { round(bignumber(1.2), bignumber(1.2)) }, /Error: Number of decimals in function round must be an integer/)
+    assert.throws(function () { round(round(fraction('1/2'), 1.2)) }, /Error: Number of decimals in function round must be an integer/)
   })
 
   it('should throw an error if used with wrong number of arguments', function () {
@@ -86,6 +88,7 @@ describe('round', function () {
     assert.strictEqual(round(fraction('1/2')).toString(), '1')
 
     assert.strictEqual(round(fraction('1/2'), 1).toString(), '0.5')
+    assert.deepStrictEqual(round(fraction(2, 3), bignumber(2)), fraction(67, 100))
   })
 
   it('should gracefully handle round-off errors', function () {
@@ -109,17 +112,38 @@ describe('round', function () {
   })
 
   it('should round real and imag part of a complex number', function () {
-    assert.deepStrictEqual(round(math.complex(2.2, math.pi)), math.complex(2, 3))
+    assert.deepStrictEqual(round(complex(2.2, math.pi)), complex(2, 3))
   })
 
   it('should round a complex number with a bignumber as number of decimals', function () {
-    assert.deepStrictEqual(round(math.complex(2.157, math.pi), bignumber(2)), math.complex(2.16, 3.14))
+    assert.deepStrictEqual(round(complex(2.157, math.pi), bignumber(2)), complex(2.16, 3.14))
   })
 
-  it('should throw an error if used with a unit', function () {
-    assert.throws(function () { round(math.unit('5cm')) }, TypeError, 'Function round(unit) not supported')
-    assert.throws(function () { round(math.unit('5cm'), 2) }, TypeError, 'Function round(unit) not supported')
-    assert.throws(function () { round(math.unit('5cm'), bignumber(2)) }, TypeError, 'Function round(unit) not supported')
+  it('should round units', function () {
+    assert.deepStrictEqual(round(unit('3.12345 cm'), 3, unit('cm')), unit('3.123 cm'))
+    assert.deepStrictEqual(round(unit('3.12345 cm'), unit('cm')), unit('3 cm'))
+    assert.deepStrictEqual(round(unit('2 inch'), unit('cm')), unit('5 cm'))
+    assert.deepStrictEqual(round(unit('2 inch'), 1, unit('cm')), unit('5.1 cm'))
+
+    // bignumber values
+    assert.deepStrictEqual(round(unit('3.12345 cm'), bignumber(2), unit('cm')), unit('3.12 cm'))
+    assert.deepStrictEqual(round(unit(bignumber('2'), 'inch'), unit('cm')), unit(bignumber('5'), 'cm'))
+    assert.deepStrictEqual(round(unit(bignumber('2'), 'inch'), bignumber(1), unit('cm')), unit(bignumber('5.1'), 'cm'))
+
+    // first argument is a collection
+    assert.deepStrictEqual(round([unit('2 inch'), unit('3 inch')], unit('cm')), [unit('5 cm'), unit('8 cm')])
+    assert.deepStrictEqual(round(matrix([unit('2 inch'), unit('3 inch')]), unit('cm')), matrix([unit('5 cm'), unit('8 cm')]))
+  })
+
+  it('should throw an error if used with a unit without valueless unit', function () {
+    assert.throws(function () { round(unit('5cm')) }, TypeError, 'Function round(unit) not supported')
+    assert.throws(function () { round(unit('5cm'), 2) }, TypeError, 'Function round(unit) not supported')
+    assert.throws(function () { round(unit('5cm'), bignumber(2)) }, TypeError, 'Function round(unit) not supported')
+  })
+
+  it('should throw an error if used with a unit with a second unit that is not valueless', function () {
+    assert.throws(function () { round(unit('2 inch'), 1, unit('10 cm')) }, Error)
+    assert.throws(function () { round(unit('2 inch'), unit('10 cm')) }, Error)
   })
 
   it('should convert to a number when used with a string', function () {
@@ -143,6 +167,8 @@ describe('round', function () {
     it('should round array and scalar', function () {
       assert.deepStrictEqual(round([1.7777, 2.3456], 3), [1.778, 2.346])
       assert.deepStrictEqual(round(3.12385, [2, 3]), [3.12, 3.124])
+      assert.deepStrictEqual(round(fraction(44, 7), [2, 3]),
+        [fraction(629, 100), fraction(6286, 1000)])
     })
   })
 
@@ -155,6 +181,8 @@ describe('round', function () {
       assert.deepStrictEqual(round(matrix([[1.7777, 2.3456], [-90.8272, 0]]), 3), matrix([[1.778, 2.346], [-90.827, 0]]))
       assert.deepStrictEqual(round(3.12385, matrix([[2, 3], [0, 2]])), matrix([[3.12, 3.124], [3, 3.12]]))
       assert.deepStrictEqual(round(0.0, matrix([2, 3])), matrix([0, 0]))
+      assert.deepStrictEqual(round(complex(2.7182, 6.2831), matrix([2, 3])),
+        matrix([complex(2.72, 6.28), complex(2.718, 6.283)]))
     })
   })
 
@@ -167,6 +195,8 @@ describe('round', function () {
       assert.deepStrictEqual(round(sparse([[1.7777, 2.3456], [-90.8272, 0]]), 3), sparse([[1.778, 2.346], [-90.827, 0]]))
       assert.deepStrictEqual(round(3.12385, sparse([[2, 3], [0, 2]])), matrix([[3.12, 3.124], [3, 3.12]]))
       assert.deepStrictEqual(round(0.0, sparse([2, 3])), sparse([0, 0]))
+      assert.deepStrictEqual(round(bignumber(6.28318), sparse([0, 4])),
+        matrix([[bignumber(6)], [bignumber(6.2832)]]))
     })
   })
 

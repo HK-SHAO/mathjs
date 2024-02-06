@@ -32,11 +32,11 @@ describe('security', function () {
 
   it('should not allow calling constructor', function () {
     assert.throws(function () {
-      math.evaluate('constructor')
+      math.evaluate('constructor', {})
     }, /Error: No access to property "constructor"/)
 
     assert.throws(function () {
-      math.evaluate('toString')
+      math.evaluate('toString', {})
     }, /Cannot access method "toString" as a property/)
   })
 
@@ -117,11 +117,11 @@ describe('security', function () {
     assert.throws(function () {
       math.evaluate('p = parser()\n' +
           'p.evaluate("", [])\n' +
-          'o = p.get("constructor")\n' +
-          'c = o.getOwnPropertyDescriptor(o.__proto__, "constructor")\n' +
+          'o = p.get("constructor")\n' + // this returns undefined
+          'c = o.getOwnPropertyDescriptor(o.__proto__, "constructor")\n' + // errors here!
           'f = c.value("console.log(\'hacked...\')")\n' +
           'f()')
-    }, /Error: No access to property "constructor"/)
+    }, /Error: No access to method "getOwnPropertyDescriptor"/)
   })
 
   it('should not allow calling Function via a symbol', function () {
@@ -362,6 +362,16 @@ describe('security', function () {
     assert.throws(function () { math.evaluate('unit("5cm").valueOf') }, /Cannot access method "valueOf" as a property/)
   })
 
+  it('should not allow accessing constructor via FunctionNode.name', function () {
+    assert.throws(function () {
+      // could execute a nodejs script like "return process.mainModule.require(child_process).execSync(whoami)"
+      const result = math.evaluate('evalFunctionNode=parse("constructor(\'return process.version\')")._compile({},{});' +
+        'f=evalFunctionNode(null,cos);' +
+        'f()')
+      console.warn('Hacked! node.js version:', result.entries[0])
+    }, /No access to property "constructor"/)
+  })
+
   it('should not have access to specific namespaces', function () {
     Object.keys(math.expression.mathWithTransform).forEach(function (name) {
       const value = math.expression.mathWithTransform[name]
@@ -391,7 +401,7 @@ describe('security', function () {
     assert.deepStrictEqual(math.evaluate('chain'), math.unit('chain'))
   })
 
-  it('should not allow polluting the Object prototype via config', () => {
+  it('should not allow polluting the Object prototype via config', function () {
     const obj = {}
     assert.strictEqual(obj.polluted, undefined)
 
@@ -401,7 +411,7 @@ describe('security', function () {
     assert.strictEqual(obj.polluted, undefined)
   })
 
-  it('should not allow polluting the Object prototype via config via the expression parser', () => {
+  it('should not allow polluting the Object prototype via config via the expression parser', function () {
     const obj = {}
     assert.strictEqual(obj.polluted, undefined)
 
@@ -410,7 +420,7 @@ describe('security', function () {
     assert.strictEqual(obj.polluted, undefined)
   })
 
-  it('should not allow polluting the Object prototype by creating an object in the expression parser', () => {
+  it('should not allow polluting the Object prototype by creating an object in the expression parser', function () {
     const obj = {}
     assert.strictEqual(obj.polluted, undefined)
 

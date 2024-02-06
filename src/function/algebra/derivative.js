@@ -43,14 +43,14 @@ export const createDerivative = /* #__PURE__ */ factory(name, dependencies, ({
    *
    * Syntax:
    *
-   *     derivative(expr, variable)
-   *     derivative(expr, variable, options)
+   *     math.derivative(expr, variable)
+   *     math.derivative(expr, variable, options)
    *
    * Examples:
    *
-   *     math.derivative('x^2', 'x')                     // Node {2 * x}
-   *     math.derivative('x^2', 'x', {simplify: false})  // Node {2 * 1 * x ^ (2 - 1)
-   *     math.derivative('sin(2x)', 'x'))                // Node {2 * cos(2 * x)}
+   *     math.derivative('x^2', 'x')                     // Node '2 * x'
+   *     math.derivative('x^2', 'x', {simplify: false})  // Node '2 * 1 * x ^ (2 - 1)'
+   *     math.derivative('sin(2x)', 'x'))                // Node '2 * cos(2 * x)'
    *     math.derivative('2*x', 'x').evaluate()          // number 2
    *     math.derivative('x^2', 'x').evaluate({x: 4})    // number 8
    *     const f = math.parse('x^2')
@@ -69,39 +69,19 @@ export const createDerivative = /* #__PURE__ */ factory(name, dependencies, ({
    *                         be simplified.
    * @return {ConstantNode | SymbolNode | ParenthesisNode | FunctionNode | OperatorNode}    The derivative of `expr`
    */
-  const derivative = typed('derivative', {
-    'Node, SymbolNode, Object': function (expr, variable, options) {
-      const constNodes = {}
-      constTag(constNodes, expr, variable.name)
-      const res = _derivative(expr, constNodes)
-      return options.simplify ? simplify(res) : res
-    },
-    'Node, SymbolNode': function (expr, variable) {
-      return this(expr, variable, { simplify: true })
-    },
+  function plainDerivative (expr, variable, options = { simplify: true }) {
+    const constNodes = {}
+    constTag(constNodes, expr, variable.name)
+    const res = _derivative(expr, constNodes)
+    return options.simplify ? simplify(res) : res
+  }
 
-    'string, SymbolNode': function (expr, variable) {
-      return this(parse(expr), variable)
-    },
-    'string, SymbolNode, Object': function (expr, variable, options) {
-      return this(parse(expr), variable, options)
-    },
+  typed.addConversion(
+    { from: 'identifier', to: 'SymbolNode', convert: parse })
 
-    'string, string': function (expr, variable) {
-      return this(parse(expr), parse(variable))
-    },
-    'string, string, Object': function (expr, variable, options) {
-      return this(parse(expr), parse(variable), options)
-    },
-
-    'Node, string': function (expr, variable) {
-      return this(expr, parse(variable))
-    },
-    'Node, string, Object': function (expr, variable, options) {
-      return this(expr, parse(variable), options)
-    }
-
-    // TODO: replace the 8 signatures above with 4 as soon as typed-function supports optional arguments
+  const derivative = typed(name, {
+    'Node, SymbolNode': plainDerivative,
+    'Node, SymbolNode, Object': plainDerivative
 
     /* TODO: implement and test syntax with order of derivatives -> implement as an option {order: number}
     'Node, SymbolNode, ConstantNode': function (expr, variable, {order}) {
@@ -116,6 +96,9 @@ export const createDerivative = /* #__PURE__ */ factory(name, dependencies, ({
     */
   })
 
+  typed.removeConversion(
+    { from: 'identifier', to: 'SymbolNode', convert: parse })
+
   derivative._simplify = true
 
   derivative.toTex = function (deriv) {
@@ -129,7 +112,7 @@ export const createDerivative = /* #__PURE__ */ factory(name, dependencies, ({
       if (isConstantNode(expr) && typeOf(expr.value) === 'string') {
         return _derivTex(parse(expr.value).toString(), x.toString(), 1)
       } else {
-        return _derivTex(expr.toString(), x.toString(), 1)
+        return _derivTex(expr.toTex(), x.toString(), 1)
       }
     },
     'Node, ConstantNode': function (expr, x) {
@@ -243,10 +226,6 @@ export const createDerivative = /* #__PURE__ */ factory(name, dependencies, ({
     },
 
     'FunctionNode, Object': function (node, constNodes) {
-      if (node.args.length !== 1) {
-        funcArgsCheck(node)
-      }
-
       if (constNodes[node] !== undefined) {
         return createConstantNode(0)
       }
@@ -320,9 +299,12 @@ export const createDerivative = /* #__PURE__ */ factory(name, dependencies, ({
           }
           break
         case 'pow':
-          constNodes[arg1] = constNodes[node.args[1]]
-          // Pass to pow operator node parser
-          return _derivative(new OperatorNode('^', 'pow', [arg0, node.args[1]]), constNodes)
+          if (node.args.length === 2) {
+            constNodes[arg1] = constNodes[node.args[1]]
+            // Pass to pow operator node parser
+            return _derivative(new OperatorNode('^', 'pow', [arg0, node.args[1]]), constNodes)
+          }
+          break
         case 'exp':
           // d/dx(e^x) = e^x
           funcDerivative = new FunctionNode('exp', [arg0.clone()])
@@ -580,7 +562,9 @@ export const createDerivative = /* #__PURE__ */ factory(name, dependencies, ({
           ])
           break
         case 'gamma': // Needs digamma function, d/dx(gamma(x)) = gamma(x)digamma(x)
-        default: throw new Error('Function "' + node.name + '" is not supported by derivative, or a wrong number of arguments is passed')
+        default:
+          throw new Error('Cannot process function "' + node.name + '" in derivative: ' +
+          'the function is not supported, undefined, or the number of arguments passed to it are not supported')
       }
 
       let op, func
@@ -757,33 +741,10 @@ export const createDerivative = /* #__PURE__ */ factory(name, dependencies, ({
         ])
       }
 
-      throw new Error('Operator "' + node.op + '" is not supported by derivative, or a wrong number of arguments is passed')
+      throw new Error('Cannot process operator "' + node.op + '" in derivative: ' +
+        'the operator is not supported, undefined, or the number of arguments passed to it are not supported')
     }
   })
-
-  /**
-   * Ensures the number of arguments for a function are correct,
-   * and will throw an error otherwise.
-   *
-   * @param {FunctionNode} node
-   */
-  function funcArgsCheck (node) {
-    // TODO add min, max etc
-    if ((node.name === 'log' || node.name === 'nthRoot' || node.name === 'pow') && node.args.length === 2) {
-      return
-    }
-
-    // There should be an incorrect number of arguments if we reach here
-
-    // Change all args to constants to avoid unidentified
-    // symbol error when compiling function
-    for (let i = 0; i < node.args.length; ++i) {
-      node.args[i] = createConstantNode(0)
-    }
-
-    node.compile().evaluate()
-    throw new Error('Expected TypeError, but none found')
-  }
 
   /**
    * Helper function to create a constant node with a specific type
